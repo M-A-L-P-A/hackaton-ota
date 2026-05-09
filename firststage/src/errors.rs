@@ -9,12 +9,11 @@ pub enum FirmwareFileError {
     SignatureError,
     KeyNotFound,
     LengthMismatch,
-    NotCompatible,
-    DuplicatedSection,
-    NoSections,
-    IllegalSectionOne,
     GarbageDataFound,
-    SectionChecksumError,
+    DowngradeAttempted,
+
+    ReadError,
+    WriteError,
 }
 
 

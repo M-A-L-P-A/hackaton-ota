@@ -2,7 +2,7 @@
 #![no_std]
 extern crate alloc;
 
-mod structs;
-mod traits;
-mod errors;
-mod core;
+pub mod structs;
+pub mod traits;
+pub mod errors;
+pub mod core;

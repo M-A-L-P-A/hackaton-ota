@@ -1,9 +1,7 @@
-use alloc::vec::{Vec};
-use alloc::vec;
 use ml_dsa::{MlDsa87, Signature, VerifyingKey, signature::Verifier};
-use sha2::{Digest, Sha256, Sha512};
+use sha2::{Digest, Sha512};
 
-use crate::{errors::FirmwareFileError, structs::{ADDITIONAL_METADATA_OFFSET, AdditionalMetadata, FirmwareSection, SECTIONS_OFFSET}, traits::{FirmwareFileProvider, FirmwareSectionWriter, FirmwareUpdateTrigger, KeyProvider}};
+use crate::{errors::FirmwareFileError, structs::{ADDITIONAL_METADATA_OFFSET, AdditionalMetadata}, traits::{FirmwareFileProvider, FirmwareUpdateTrigger, KeyProvider}};
 
 // Checks the main header and all signatures.
 pub fn validate_main_header(key_provider: &dyn KeyProvider, data_provider: &mut dyn FirmwareFileProvider) -> Result<(), FirmwareFileError> {
@@ -78,89 +76,15 @@ pub fn validate_magic_and_additional_metadata(data_provider: &mut dyn FirmwareFi
     }
 }
 
-pub fn extract_sections_info(
-    data_provider: &mut dyn FirmwareFileProvider,
-) -> Result<Vec<FirmwareSection>, FirmwareFileError> {
-    data_provider.seek(SECTIONS_OFFSET);
-    let mut sections = Vec::new();
-    loop {
-        let mut section_buffer = [0u8; 8 + 8 + 32];
-        data_provider.read_exact(&mut section_buffer)?;
-        // If all zeros - end reached.
-        if section_buffer.iter().all(|e| *e == 0) {
-            break;
-        }
-        let section = FirmwareSection::from(&section_buffer)?;
-        if sections.iter().any(|e: &FirmwareSection| e.id == section.id) {
-            return Err(FirmwareFileError::DuplicatedSection);
-        }
-        sections.push(section);
-    }
-
-    if sections.is_empty() {
-        return Err(FirmwareFileError::NoSections);
-    }
-
-    if sections[0].id != 1 {
-        return Err(FirmwareFileError::IllegalSectionOne);
-    }
-
-    Ok(sections)
-}
-
-fn read_second_stage(data_provider: &mut dyn FirmwareFileProvider, sections: &[FirmwareSection]) -> Result<Vec<u8>, FirmwareFileError> {
-    // At this point it's verified that there exist sections, and section[0]'s id is 1.
-    let mut section_0 = vec![0u8; sections[0].size as usize];
-    data_provider.read_exact(&mut section_0)?;
-
-    // Check shasum
-    let mut hasher = Sha256::new();
-    hasher.update(&section_0);
-    if hasher.finalize().as_slice() != sections[0].sha256sum {
-        Err(FirmwareFileError::SectionChecksumError)
-    } else {
-        Ok(section_0)
-    }
-}
-
-fn write_sections(
-    data_provider: &mut dyn FirmwareFileProvider,
-    output_sections_writer: &mut dyn FirmwareSectionWriter,
-    sections: &[FirmwareSection]
-) -> Result<(), FirmwareFileError> {
-    let mut cursor = data_provider.tell();
-    for section in sections.iter().skip(1) {
-        // TODO: Check sha256.
-        output_sections_writer.write_part(section.id, data_provider, section.size)?;
-
-        // Assertion: If the output_section_writer read more than expected, that's a programming error - crash the system.
-        assert_eq!(cursor + section.size, data_provider.tell());
-
-        cursor += section.size;
-    }
-    // At this point we should be at the end of the file:
-    if cursor != data_provider.tell() {
-        Err(FirmwareFileError::GarbageDataFound)
-    } else {
-        Ok(())
-    }
-}
-
 pub fn perform_update(
     key_provider: &dyn KeyProvider,
     data_provider: &mut dyn FirmwareFileProvider,
-    output_sections_writer: &mut dyn FirmwareSectionWriter,
     trigger: &dyn FirmwareUpdateTrigger,
 ) -> Result<(), FirmwareFileError> {
     // Read whether or not we're even compatible with this firmware update:
     validate_magic_and_additional_metadata(data_provider, trigger)?;
     // Read the main header (and check signatures):
     validate_main_header(key_provider, data_provider)?;
-    // Extract the sections:
-    let sections = extract_sections_info(data_provider)?;
-    let second_stage = read_second_stage(data_provider, &sections)?;
-    // Extract sections to the writer. The cursor is just behind section 1:
-    write_sections(data_provider, output_sections_writer, &sections)?;
-    // Run second stage:
-    trigger.execute(&second_stage);
+    // Export second stage updater
+    trigger.export_and_execute(data_provider)
 }
