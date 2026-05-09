@@ -44,13 +44,17 @@ The file will consist of three parts:
 The main header for now consists of the following fields (notice the section being aligned to 16 byte boundary):
 
 - Magic number: `UPXD0001` - 8 bytes
-- SHA512SUM of the (sections data + actual contents) - 64 bytes
+- SHA512SUM of the (additional metadata + sections data + actual contents) - 64 bytes
 - Key ID - 8 bytes
 - Signature (RSA2048) - 256 bytes
 
 The `Key ID` will let the updater select the correct firmware decryption key, as well as the signature verification key. It being an integer also reduces the attack surface - strings defining the pathname can get concatenated incorrectly, causing potential issues.
 
 This layout means that the rest of the file can be treated as a "immutable blob" secured by the signature.
+
+### Additional metadata
+
+The additional metadata section is meant to describe additional data which may be used to make sure the update should be peformed, and that an illegal operation, such as a downgrade, cannot happen. As of right now, it shall be defined as just a 16 byte version ID.
 
 ### Sections data
 
