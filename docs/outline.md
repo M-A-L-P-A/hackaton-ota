@@ -26,7 +26,7 @@ In order to prevent a bad update from affecting a large amount of users, the upd
 So as to keep things simple during the presentation, the function mapping the installation's random serial number to a given cohort is as follows:
 
 ```
-cohort = xxhash(serial_number) % 16
+cohort = javaHashCode(serial_number) % 16
 ```
 
 This should split the userbase into 16 cohorts. There will be 16 groups of users, each getting the update file at a different time. In case of a bad update, only a group of users should be affected, instead of everyone.
