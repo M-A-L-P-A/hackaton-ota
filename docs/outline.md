@@ -36,6 +36,7 @@ The firmware update file shall be a custom-made archive. Existing archive files 
 The file will consist of three parts:
 
 - Main header
+- Additional metadat
 - Sections data
 - Actual contents
 
@@ -54,7 +55,12 @@ This layout means that the rest of the file can be treated as a "immutable blob"
 
 ### Additional metadata
 
-The additional metadata section is meant to describe additional data which may be used to make sure the update should be peformed, and that an illegal operation, such as a downgrade, cannot happen. As of right now, it shall be defined as just a 16 byte version ID.
+The additional metadata section is meant to describe additional data which may be used to make sure the update should be peformed, and that an illegal operation, such as a downgrade, cannot happen.
+
+Structure:
+
+- Semver (2 bytes for each: major, minor, patch, alpha) - 8 bytes in total.
+- Flags: 8 bytes - additional data which might be used to discern if an illicit operation was happening.
 
 ### Sections data
 
